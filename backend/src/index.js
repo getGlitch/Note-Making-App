@@ -10,7 +10,7 @@ const app = express();
 app.use(body_parser.json());
 app.use(cors());
 connectToDb();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT;
 
 app.use("/auth",AuthRoutes);
 app.use("/notes", NotesRoutes);
