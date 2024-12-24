@@ -13,7 +13,10 @@ connectToDb();
 const PORT = process.env.PORT || 8000;
 
 app.use("/auth",AuthRoutes);
-app.use("/notes", NotesRoutes)
+app.use("/notes", NotesRoutes);
+app.get("/",(req,res)=>{
+    res.send("Welcome User...");
+});
 
 
 app.listen(PORT,()=>{
