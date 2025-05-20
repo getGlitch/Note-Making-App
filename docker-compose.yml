@@ -17,7 +17,7 @@ services:
     build:
       context: ./frontend  # The directory where the frontend's Dockerfile is located
       args:
-        - VITE_BACKEND_BASE_URL= http://51.20.10.28:5000  # Build-time variable (will be set from .env file)
+        - VITE_BACKEND_BASE_URL= http://backend:5000  # Build-time variable (will be set from .env file)
     ports:
       - "3000:80"  # Maps frontend container port 80 (Nginx) to host port 3000
     depends_on:
