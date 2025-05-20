@@ -75,7 +75,10 @@ jobs:
             --filters "Name=tag:Name,Values=${{ env.PROJECT_NAME }}-instance-*" "Name=instance-state-name,Values=running" \
             --query 'Reservations[*].Instances[*].PublicIpAddress' \
             --output text)
-          echo "ips=$ips" >> $GITHUB_OUTPUT
+          ips=$(echo $ips | xargs)
+          
+          echo "ips=$ips" >> "$GITHUB_OUTPUT"
+         
 
       - name: Deploy MERN app on EC2 instances
         run: |
