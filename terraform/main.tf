@@ -1,3 +1,5 @@
+# main.tf
+
 provider "aws" {
   region = var.region
 }
@@ -11,54 +13,44 @@ resource "aws_vpc" "main" {
   }
 }
 
-resource "aws_internet_gateway" "gw" {
+resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
   tags = {
     Name = "${var.project_name}-igw"
   }
 }
 
-resource "aws_subnet" "public" {
-  count                   = 2
+resource "aws_subnet" "public_subnets" {
+  count                   = length(var.availability_zones)
   vpc_id                  = aws_vpc.main.id
   cidr_block              = cidrsubnet("10.0.0.0/16", 8, count.index)
   availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
   tags = {
-    Name = "${var.project_name}-public-${count.index}"
+    Name = "${var.project_name}-public-subnet-${count.index + 1}"
   }
 }
 
-resource "aws_subnet" "private" {
-  count             = 2
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet("10.0.0.0/16", 8, count.index + 10)
-  availability_zone = var.availability_zones[count.index]
-  tags = {
-    Name = "${var.project_name}-private-${count.index}"
-  }
-}
-
-resource "aws_route_table" "public" {
+resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.main.id
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.gw.id
+    gateway_id = aws_internet_gateway.igw.id
   }
   tags = {
     Name = "${var.project_name}-public-rt"
   }
 }
 
-resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
+resource "aws_route_table_association" "public_assoc" {
+  count          = length(aws_subnet.public_subnets)
+  subnet_id      = aws_subnet.public_subnets[count.index].id
+  route_table_id = aws_route_table.public_rt.id
 }
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Allow HTTP"
+  description = "Allow HTTP access"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -78,14 +70,14 @@ resource "aws_security_group" "alb_sg" {
 
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
-  description = "Allow ALB access"
+  description = "Allow all traffic (testing only)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port       = 3000
-    to_port         = 5000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]  # Allow all IPv4 traffic
   }
 
   egress {
@@ -96,46 +88,12 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-resource "aws_launch_template" "app" {
-  name_prefix   = "${var.project_name}-lt"
-  image_id      = var.ubuntu_ami
-  instance_type = var.instance_type
-
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-
-  user_data = base64encode(file("${path.module}/user_data.sh"))
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = {
-      Name = "${var.project_name}-instance"
-    }
-  }
-}
-
-resource "aws_autoscaling_group" "asg" {
-  name                      = "${var.project_name}-asg"
-  max_size                  = 2
-  min_size                  = 2
-  desired_capacity          = 2
-  vpc_zone_identifier       = aws_subnet.private[*].id
-  launch_template {
-    id      = aws_launch_template.app.id
-    version = "$Latest"
-  }
-  tag {
-    key                 = "Name"
-    value               = "${var.project_name}-instance"
-    propagate_at_launch = true
-  }
-}
-
-resource "aws_lb" "app_lb" {
+resource "aws_lb" "app_alb" {
   name               = "${var.project_name}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = aws_subnet.public[*].id
+  subnets            = aws_subnet.public_subnets[*].id
 
   tags = {
     Name = "${var.project_name}-alb"
@@ -144,23 +102,13 @@ resource "aws_lb" "app_lb" {
 
 resource "aws_lb_target_group" "app_tg" {
   name     = "${var.project_name}-tg"
-  port     = 3000
+  port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
-  target_type = "instance"
-
-  health_check {
-    path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 5
-    unhealthy_threshold = 2
-    matcher             = "200"
-  }
 }
 
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.app_lb.arn
+resource "aws_lb_listener" "app_listener" {
+  load_balancer_arn = aws_lb.app_alb.arn
   port              = 80
   protocol          = "HTTP"
 
@@ -170,8 +118,24 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-resource "aws_autoscaling_attachment" "asg_attachment" {
-  autoscaling_group_name = aws_autoscaling_group.asg.name
-  
+resource "aws_instance" "app_instances" {
+  count         = 2
+  ami           = var.ubuntu_ami
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.public_subnets[count.index].id
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  key_name      = var.ssh_key_name
+
+  user_data = file("user_data.sh")
+
+  tags = {
+    Name = "${var.project_name}-instance-${count.index + 1}"
+  }
 }
 
+resource "aws_lb_target_group_attachment" "app_attachment" {
+  count            = 2
+  target_group_arn = aws_lb_target_group.app_tg.arn
+  target_id        = aws_instance.app_instances[count.index].id
+  port             = 80
+}
