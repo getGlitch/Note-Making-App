@@ -6,6 +6,7 @@ on:
       - main
 
 env:
+  ALB_DNS: note-making-proj-alb-682722499.eu-north-1.elb.amazonaws.com
   PROJECT_NAME: note-making-proj      # Your Terraform project name here
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
