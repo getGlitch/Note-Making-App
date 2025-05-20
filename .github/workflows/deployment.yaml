@@ -56,7 +56,12 @@ jobs:
         run: |
           docker build --build-arg VITE_BACKEND_BASE_URL="http://${{ env.ALB_DNS }}:5000" -t ${{ env.DOCKERHUB_USERNAME }}/mern-frontend:latest ./frontend
           docker push ${{ env.DOCKERHUB_USERNAME }}/mern-frontend:latest
-
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.6
+          
       - name: Terraform Init & Apply
         run: |
           cd terraform
