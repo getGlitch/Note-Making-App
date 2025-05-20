@@ -17,3 +17,9 @@ variable "ubuntu_ami" {
 variable "availability_zones" {
   default = ["eu-north-1a", "eu-north-1b"]
 }
+variable "ssh_key_name" {
+  type        = string
+}
+variable "my_ip_cidr" {
+  default     = "0.0.0.0/0"
+}
