@@ -7,10 +7,10 @@ on:
 
 env:
   ALB_DNS: note-making-proj-alb-682722499.eu-north-1.elb.amazonaws.com
-  PROJECT_NAME: note-making-proj      # Your Terraform project name here
+  PROJECT_NAME: note-making-proj
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-  SSH_USER: ubuntu                   # Assuming Ubuntu AMI user
+  SSH_USER: ubuntu
   SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
 
 jobs:
@@ -20,6 +20,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Debug secrets presence
+        run: |
+          echo "DOCKERHUB_USERNAME set? ${{ secrets.DOCKERHUB_USERNAME != '' }}"
+          echo "AWS_ACCESS_KEY_ID set? ${{ secrets.AWS_ACCESS_KEY_ID != '' }}"
+          echo "AWS_SECRET_ACCESS_KEY set? ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}"
+          echo "EC2_SSH_KEY set? ${{ secrets.EC2_SSH_KEY != '' }}"
 
       - name: Set up AWS CLI
         uses: aws-actions/configure-aws-credentials@v2
